@@ -3,7 +3,7 @@ from typing import Optional
 from schnapsen.game import Bot, PlayerPerspective, Move
 
 
-class RandBot(Bot):
+class StrategyBot3(Bot):
     def __init__(self, seed: int) -> None:
         self.seed = seed
         self.rng = random.Random(self.seed)
