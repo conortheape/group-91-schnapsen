@@ -5,7 +5,7 @@ from typing import Optional
 
 import click
 from schnapsen.bots import MLDataBot, train_ML_model, MLPlayingBot, RandBot
-
+from schnapsen.bots.strategybot1 import StrategyBot1
 from schnapsen.bots.example_bot import ExampleBot
 
 from schnapsen.game import (Bot, Move, PlayerPerspective,
@@ -196,7 +196,25 @@ def game_24() -> None:
 
 @main.command()
 def test_game_with_your_bot():
-    pass
+    global opponent, strat
+    random.seed(1)
+    engine = SchnapsenGamePlayEngine()
+
+    stratWins = 0
+    opponentWins = 0
+    for i in range(2):
+        strat = bot1 = StrategyBot1(432234)
+        opponent = bot2 = RandBot(36434)
+
+        winner, points, score = engine.play_game(bot1, bot2, random.Random(i))
+        print(f"{winner} won the game with {points} points. Score: {score}\n")
+        if winner == strat:
+            stratWins += 1
+        else:
+            opponentWins += 1
+    print(f"----- Total -----\n"
+          f"{strat} wins: {stratWins}\n"
+          f"{opponent} wins: {opponentWins}")
 
 
 if __name__ == "__main__":
