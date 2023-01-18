@@ -194,6 +194,22 @@ def game_24() -> None:
         winner_id, game_points, score = engine.play_game(bot1, bot2, random.Random(i))
         print(f"Game ended. Winner is {winner_id} with {game_points} points, score {score}")
 
+@main.command()
+def test_game_with_your_bot():
+    engine = SchnapsenGamePlayEngine()
+    rdeep = bot1 = RdeepBot(num_samples=16, depth=4, rand=random.Random(4564654644))
+    rand = bot2 = RandBot(696969) # REPLACE RandBot() WITH YOUR BOT YOU WANT TO TEST
+    wins = 0
+    amount = 100
+    for game_number in range(1, amount + 1):
+        if game_number % 2 == 0:
+            bot1, bot2 = bot2, bot1
+        winner_id, _, _ = engine.play_game(bot1, bot2, random.Random(game_number))
+        if winner_id == rand:
+            wins += 1
+        if game_number % 10 == 0:
+            print(f"{rand} won {wins} games out of {game_number}")
+
 
 if __name__ == "__main__":
     main()
