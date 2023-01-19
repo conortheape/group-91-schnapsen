@@ -1,8 +1,8 @@
 import random
 from collections.abc import Iterable
 from typing import Optional, Dict
-from schnapsen.game import Bot, PlayerPerspective, Move, Card
-
+from schnapsen.game import Bot, PlayerPerspective, Move, Card, GamePhase
+from schnapsen.deck import Suit, Rank
 
 
 class StrategyBot1(Bot):
@@ -10,15 +10,16 @@ class StrategyBot1(Bot):
         self.seed = seed
         self.rng = random.Random(self.seed)
 
-        self.aceWeight = 16
-        self.tenWeight = 14
-        self.jackWeight = 10
-        self.kingWeight = 3
-        self.queenWeight = 2
-        self.trumpMultiplier = 5
+        self.aceWeight = 5
+        self.tenWeight = 5
+        self.jackWeight = 5
+        self.kingWeight = 5
+        self.queenWeight = 5
 
         self.runningHand = {}
         self.marriageHand = {}
+
+        self.numTricksPlayed = 0
 
     def get_move(self, state: PlayerPerspective, leader_move: Optional[Move]) -> Move:
         global action
@@ -33,10 +34,9 @@ class StrategyBot1(Bot):
             if action.cards[0] in self.runningHand:
                 move = action
 
+        self.numTricksPlayed += 1
         del self.runningHand[move.cards[0]]
         return move
-
-
 
     def update_hand(self, hand):
         """
@@ -45,15 +45,15 @@ class StrategyBot1(Bot):
         for card in hand:
             if card not in self.runningHand:
                 if card.rank.value == 1:
-                    self.runningHand[card] = 16
+                    self.runningHand[card] = self.aceWeight
                 if card.rank.value == 10:
-                    self.runningHand[card] = 14
+                    self.runningHand[card] = self.tenWeight
                 if card.rank.value == 11:
-                    self.runningHand[card] = 10
+                    self.runningHand[card] = self.jackWeight
                 if card.rank.value == 13:
-                    self.runningHand[card] = 3
+                    self.runningHand[card] = self.kingWeight
                 if card.rank.value == 12:
-                    self.runningHand[card] = 2
+                    self.runningHand[card] = self.queenWeight
 
     def check_marriages(self, state, leader_move):
         """
@@ -64,34 +64,50 @@ class StrategyBot1(Bot):
                 for card2 in self.runningHand.copy():
                     if card2.rank.value == 13 and card2.suit.value == card.suit.value:
                         if leader_move:
-                            self._divide_marriage_weights(state, card, card2)
                             self._separate_marriage(card, card2)
                         else:
-                            self._multiply_marriage_weights(state, card, card2)
                             self._separate_marriage(card, card2)
 
     def update_weights(self, state, leader_move):
-        pass
+        print(self.aceWeight)
+
+    def _set_trumpcards_weights(self, trumpSuit: Suit, influenceFactor: float) -> None:
+        """
+        Uses the trump suit to influence the weights of the trump cards in the running hand.
+        influenceFactor: - is how much to divide by, + is how much to multiply by
+        """
+        if influenceFactor < 0:
+            for card in self.runningHand:
+                if card.suit == trumpSuit:
+                    if card.rank == Rank.ACE:
+                        self.runningHand[card] = self.aceWeight / abs(influenceFactor)
+                    elif card.rank == Rank.TEN:
+                        self.runningHand[card] = self.tenWeight / abs(influenceFactor)
+                    elif card.rank == Rank.KING:
+                        self.runningHand[card] = self.kingWeight / abs(influenceFactor)
+                    elif card.rank == Rank.QUEEN:
+                        self.runningHand[card] = self.queenWeight / abs(influenceFactor)
+                    elif card.rank == Rank.JACK:
+                        self.runningHand[card] = self.jackWeight / abs(influenceFactor)
+        else:
+            for card in self.runningHand:
+                if card.suit == trumpSuit:
+                    if card.rank == Rank.ACE:
+                        self.runningHand[card] = self.aceWeight * abs(influenceFactor)
+                    elif card.rank == Rank.TEN:
+                        self.runningHand[card] = self.tenWeight * abs(influenceFactor)
+                    elif card.rank == Rank.KING:
+                        self.runningHand[card] = self.kingWeight * abs(influenceFactor)
+                    elif card.rank == Rank.QUEEN:
+                        self.runningHand[card] = self.queenWeight * abs(influenceFactor)
+                    elif card.rank == Rank.JACK:
+                        self.runningHand[card] = self.jackWeight * abs(influenceFactor)
 
     def _divide_marriage_weights(self, state, card1, card2):
-        regularMarriageDivisor = 2
-        royalMarriageDivisor = 3
-        if card1.suit.value == state.get_trump_suit().value:
-            self.runningHand[card1] /= royalMarriageDivisor
-            self.runningHand[card2] /= royalMarriageDivisor
-        else:
-            self.runningHand[card1] /= regularMarriageDivisor
-            self.runningHand[card2] /= regularMarriageDivisor
+        pass
 
     def _multiply_marriage_weights(self, state, card1, card2):
-        regularMarriageMultiplier = 4
-        royalMarriageMultiplier = 5
-        if card1.suit.value == state.get_trump_suit().value:
-            self.runningHand[card1] /= royalMarriageMultiplier
-            self.runningHand[card2] /= royalMarriageMultiplier
-        else:
-            self.runningHand[card1] /= regularMarriageMultiplier
-            self.runningHand[card2] /= regularMarriageMultiplier
+        pass
 
     def _separate_marriage(self, card1, card2):
         self.marriageHand[card1] = self.runningHand[card1]

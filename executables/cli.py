@@ -197,21 +197,21 @@ def game_24() -> None:
 @main.command()
 def test_game_with_your_bot():
     global opponent, strat
-    random.seed(1)
     engine = SchnapsenGamePlayEngine()
 
     stratWins = 0
     opponentWins = 0
-    for i in range(2):
-        strat = bot1 = StrategyBot1(432234)
-        opponent = bot2 = RandBot(36434)
+    for i in range(5, 7):
+        strat = bot1 = StrategyBot1(4235321)
+        opponent = bot2 = RandBot(873546)
 
         winner, points, score = engine.play_game(bot1, bot2, random.Random(i))
-        print(f"{winner} won the game with {points} points. Score: {score}\n")
+        print(f"{winner} won the game with {points} points. Score: {score}")
         if winner == strat:
             stratWins += 1
         else:
             opponentWins += 1
+
     print(f"----- Total -----\n"
           f"{strat} wins: {stratWins}\n"
           f"{opponent} wins: {opponentWins}")
