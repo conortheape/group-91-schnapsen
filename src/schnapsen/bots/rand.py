@@ -8,6 +8,8 @@ class RandBot(Bot):
         self.seed = seed
         self.rng = random.Random(self.seed)
 
+        self.numTricksPlayed = 0
+
     def get_move(
         self,
         state: PlayerPerspective,
@@ -15,6 +17,7 @@ class RandBot(Bot):
     ) -> Move:
         moves: list[Move] = state.valid_moves()
         move = self.rng.choice(list(moves))
+        self.numTricksPlayed += 1
         return move
 
     def __repr__(self) -> str:

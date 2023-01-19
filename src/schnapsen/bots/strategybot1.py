@@ -10,11 +10,11 @@ class StrategyBot1(Bot):
         self.seed = seed
         self.rng = random.Random(self.seed)
 
-        self.aceWeight = 5
-        self.tenWeight = 5
-        self.jackWeight = 5
-        self.kingWeight = 5
-        self.queenWeight = 5
+        self.aceWeight = 12
+        self.tenWeight = 12
+        self.jackWeight = 10
+        self.kingWeight = 3
+        self.queenWeight = 2
 
         self.runningHand = {}
         self.marriageHand = {}
@@ -69,7 +69,20 @@ class StrategyBot1(Bot):
                             self._separate_marriage(card, card2)
 
     def update_weights(self, state, leader_move):
-        print(self.aceWeight)
+        threshold = random.randint(5,8)
+        if self.numTricksPlayed < threshold:
+            self.aceWeight *= 1 + (self.numTricksPlayed / 18)
+            self.tenWeight *= 1 + (self.numTricksPlayed / 15)
+            self.jackWeight *= 1 + (self.numTricksPlayed / 12)
+
+
+
+        print(self.numTricksPlayed)
+        print(f"aceWeight: {self.aceWeight}\n"
+              f"tenWeight: {self.tenWeight}\n"
+              f"kingWeight: {self.kingWeight}\n"
+              f"queenWeight: {self.queenWeight}\n"
+              f"jackWeight: {self.jackWeight}\n")
 
     def _set_trumpcards_weights(self, trumpSuit: Suit, influenceFactor: float) -> None:
         """

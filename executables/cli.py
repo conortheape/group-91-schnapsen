@@ -216,6 +216,22 @@ def test_game_with_your_bot():
           f"{strat} wins: {stratWins}\n"
           f"{opponent} wins: {opponentWins}")
 
+@main.command()
+def test_ave_game_length():
+    engine = SchnapsenGamePlayEngine()
+
+    totalTricks = 0
+    for i in range(1000):
+        bot1 = RandBot(423532)
+        bot2 = RdeepBot(num_samples=16, depth=4, rand=random.Random(4564654644))
+
+        engine.play_game(bot1, bot2, random.Random(i))
+
+        totalTricks += bot1.numTricksPlayed
+        averageTricks = totalTricks / 1000
+        print(averageTricks)
+
+
 
 if __name__ == "__main__":
     main()
