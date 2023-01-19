@@ -201,7 +201,7 @@ def test_game_with_your_bot():
 
     stratWins = 0
     opponentWins = 0
-    for i in range(5, 7):
+    for i in range(2):
         strat = bot1 = StrategyBot1(4235321)
         opponent = bot2 = RandBot(873546)
 
