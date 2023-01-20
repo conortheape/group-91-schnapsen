@@ -201,7 +201,7 @@ def test_game_with_your_bot():
 
     stratWins = 0
     opponentWins = 0
-    for i in range(2):
+    for i in range(1):
         strat = bot1 = StrategyBot1(4235321)
         opponent = bot2 = RandBot(873546)
 
@@ -221,7 +221,7 @@ def test_ave_game_length():
     engine = SchnapsenGamePlayEngine()
 
     totalTricks = 0
-    for i in range(1000):
+    for i in range(1):
         bot1 = RandBot(423532)
         bot2 = RdeepBot(num_samples=16, depth=4, rand=random.Random(4564654644))
 

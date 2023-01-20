@@ -1,7 +1,7 @@
 import random
 from collections.abc import Iterable
 from typing import Optional, Dict
-from schnapsen.game import Bot, PlayerPerspective, Move, Card, GamePhase, Trump_Exchange, Marriage, RegularMove
+from schnapsen.game import Bot, PlayerPerspective, Move, Card, GamePhase, Trump_Exchange, Marriage, RegularMove, SchnapsenTrickScorer
 from schnapsen.deck import Suit, Rank
 
 
@@ -16,7 +16,7 @@ class StrategyBot1(Bot):
         self.kingWeight = 3
         self.queenWeight = 2
 
-        self.trumpMultiplier = 3
+        self.trumpMultiplier = 0.5
 
         self.runningHand = {}
         self.marriageHand = {}
@@ -34,32 +34,29 @@ class StrategyBot1(Bot):
         self.update_hand(state.get_hand())
         hasMarriage = self.check_marriages(state, leader_move)
 
-        print(self.runningHand)
-        print(self.marriageHand)
-
         self.update_weights(state, leader_move)
 
         for move in moves:
             if isinstance(move, Trump_Exchange):
-                print(move, "\n")
+                self._print_stats(state, leader_move, move)
                 return move
             if isinstance(move, Marriage):
-                print(move, "\n")
                 self._fix_hands_after_marriage()
+                self._print_stats(state, leader_move, move)
                 return move
 
+        bestCards = []
+        hand = self.runningHand.copy()
+        for i in range(len(self.runningHand)):
+            highestWeightCard = max(hand, key=hand.get)
+            bestCards.append(highestWeightCard)
+            del hand[highestWeightCard]
 
-
-
-        move = None
-        for action in moves:
-            if action.cards[0] in self.runningHand:
-                move = action
-
-        self.numTricksPlayed += 1
-        del self.runningHand[move.cards[0]]
-        print(move, "\n")
-        return move
+        for card in bestCards:
+            if RegularMove(card) in moves:
+                move = RegularMove(card)
+                self._print_stats(state, leader_move, move)
+                return move
 
     def update_hand(self, hand):
         """
@@ -111,7 +108,6 @@ class StrategyBot1(Bot):
 
         # Value of weights based on score (high score leads to playing stronger cards to try win)
         myScore = state.get_my_score().direct_points + state.get_my_score().pending_points
-        print(myScore)
         scoreThreshold = random.randint(40, 45)
         if myScore > scoreThreshold:
             self.aceWeight += (myScore / 2)
@@ -125,7 +121,16 @@ class StrategyBot1(Bot):
                 if self._get_counterpart(card) in self.runningHand:
                     self.runningHand[card] = self.jackWeight
 
-        # Update weights of actual cards in running hand #
+        # Might get rid of this
+        if leader_move:
+            leaderCardPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), leader_move.cards[0].rank)
+            kingPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), Rank.KING)
+            if leaderCardPoints > kingPoints:
+                self.trumpMultiplier *= 2.15
+        else:
+            self.trumpMultiplier /= 1.25
+
+        # Update weights of actual cards in running hand
         for card in self.runningHand:
             if card.rank == Rank.ACE:
                 self.runningHand[card] = self.aceWeight
@@ -141,13 +146,24 @@ class StrategyBot1(Bot):
             if card.suit == state.get_trump_suit():
                 self.runningHand[card] *= self.trumpMultiplier
 
+            # Increase weight of card with higher rank as leader move of same suit
+            if leader_move:
+                leaderCard = leader_move.cards[0]
+                if card.suit == leaderCard.suit and card.rank.value > leaderCard.rank.value:
+                    self.runningHand[card] *= 2.5
 
-        print(self.numTricksPlayed)
-        print(f"aceWeight: {self.aceWeight}\n"
+    def _print_stats(self, state, leader_move, move):
+        print(f"runningHand: {self.runningHand}\n"
+              f"marriageHand: {self.marriageHand}\n"
+              f"leader move: {leader_move}\n"
+              f"valid moves: {state.valid_moves()}\n"
+              f"myScore: {state.get_my_score()}, opponent score {state.get_opponent_score()}\n"
+              f"aceWeight: {self.aceWeight}\n"
               f"tenWeight: {self.tenWeight}\n"
               f"kingWeight: {self.kingWeight}\n"
               f"queenWeight: {self.queenWeight}\n"
-              f"jackWeight: {self.jackWeight}")
+              f"jackWeight: {self.jackWeight}\n"
+              f"my move: {move}\n")
 
     def _get_counterpart(self, card):
         if card.rank == Rank.QUEEN:
