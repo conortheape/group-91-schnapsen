@@ -201,9 +201,10 @@ def test_game_with_your_bot():
 
     stratWins = 0
     opponentWins = 0
-    for i in range(1):
+    for i in range(1000):
         strat = bot1 = StrategyBot1(4235321)
         opponent = bot2 = RandBot(873546)
+        # opponent = bot2 = RdeepBot(num_samples=16, depth=4, rand=random.Random(2353347))
 
         winner, points, score = engine.play_game(bot1, bot2, random.Random(i))
         print(f"{winner} won the game with {points} points. Score: {score}")

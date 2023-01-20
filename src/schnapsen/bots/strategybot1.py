@@ -10,13 +10,13 @@ class StrategyBot1(Bot):
         self.seed = seed
         self.rng = random.Random(self.seed)
 
-        self.aceWeight = 12
-        self.tenWeight = 12
+        self.aceWeight = 5
+        self.tenWeight = 5
         self.jackWeight = 10
         self.kingWeight = 3
         self.queenWeight = 2
 
-        self.trumpMultiplier = 0.5
+        self.trumpMultiplier = 0.8
 
         self.runningHand = {}
         self.marriageHand = {}
@@ -39,10 +39,13 @@ class StrategyBot1(Bot):
         for move in moves:
             if isinstance(move, Trump_Exchange):
                 self._print_stats(state, leader_move, move)
+                self.numTricksPlayed += 1
                 return move
             if isinstance(move, Marriage):
                 self._fix_hands_after_marriage()
                 self._print_stats(state, leader_move, move)
+                self._fix_hands_after_marriage()
+                self.numTricksPlayed += 1
                 return move
 
         bestCards = []
@@ -56,7 +59,14 @@ class StrategyBot1(Bot):
             if RegularMove(card) in moves:
                 move = RegularMove(card)
                 self._print_stats(state, leader_move, move)
+                del self.runningHand[card]
+                self.numTricksPlayed += 1
                 return move
+
+        print("this shouldn't print")
+        print(f"weird move: {move}")
+        self.numTricksPlayed += 1
+        return move
 
     def update_hand(self, hand):
         """
@@ -77,7 +87,7 @@ class StrategyBot1(Bot):
 
     def check_marriages(self, state, leader_move):
         """
-        Checks if the player has any marriages and separates them into a separate hand variable.
+        True if player has any marriages.
         """
         for card in self.runningHand.copy():
             if card.rank.value == 12:
@@ -85,6 +95,7 @@ class StrategyBot1(Bot):
                     if card2.rank.value == 13 and card2.suit.value == card.suit.value:
                         self._separate_marriage(card, card2)
                         return True
+        return False
 
     def update_weights(self, state, leader_move):
 
@@ -92,71 +103,136 @@ class StrategyBot1(Bot):
         # TODO: When not leader, if lead is trump, win if can otherwise discard low card
         # TODO: Other stuff too probably
 
-        # Base weights for general flow of game
-        threshold = random.randint(4,6)
-        if self.numTricksPlayed < threshold:
-            self.aceWeight *= 1 + (self.numTricksPlayed / 18)
-            self.tenWeight *= 1 + (self.numTricksPlayed / 15)
-            self.jackWeight *= 1 + (self.numTricksPlayed / 12)
-        else:
-            self.aceWeight /= 1 + (self.numTricksPlayed / 10)
-            self.tenWeight /= 1 + (self.numTricksPlayed / 10)
-            self.jackWeight /= 1 + (self.numTricksPlayed / 10)
+        if state.get_phase() == GamePhase.ONE:
+            # Base weights for general flow of game
+            threshold = random.randint(4,6)
+            if self.numTricksPlayed < threshold:
+                self.aceWeight *= 1 + (self.numTricksPlayed / 20)
+                self.tenWeight *= 1 + (self.numTricksPlayed / 18)
+                self.jackWeight *= 1 + (self.numTricksPlayed / 16)
+            else:
+                self.aceWeight /= 1 + (self.numTricksPlayed / 16)
+                self.tenWeight /= 1 + (self.numTricksPlayed / 16)
+                self.jackWeight /= 1 + (self.numTricksPlayed / 16)
 
-        self.kingWeight *= 1 + (self.numTricksPlayed / 20)
-        self.queenWeight *= 1 + (self.numTricksPlayed / 20)
+            self.kingWeight *= 1 + (self.numTricksPlayed / 22)
+            self.queenWeight *= 1 + (self.numTricksPlayed / 22)
 
-        # Value of weights based on score (high score leads to playing stronger cards to try win)
-        myScore = state.get_my_score().direct_points + state.get_my_score().pending_points
-        scoreThreshold = random.randint(40, 45)
-        if myScore > scoreThreshold:
-            self.aceWeight += (myScore / 2)
-            self.tenWeight += (myScore / 2)
-            self.trumpMultiplier += (myScore / 10)
+            # Value of weights based on score (high score leads to playing stronger cards to try win)
+            myScore = state.get_my_score().direct_points + state.get_my_score().pending_points
+            scoreThreshold = random.randint(40, 45)
+            if myScore > scoreThreshold:
+                self.aceWeight += (myScore / 4)
+                self.tenWeight += (myScore / 4)
+                self.trumpMultiplier += (myScore / 25)
 
-        # If you have a royal and have seen its counterpart, its weight is increased (don't need to hold onto it)
-        seenCards = state.seen_cards(leader_move).get_cards()
-        for card in self.runningHand:
-            if card.rank == Rank.QUEEN or card.rank == Rank.KING:
-                if self._get_counterpart(card) in self.runningHand:
+            # If you have a royal and have seen its counterpart, its weight is increased (don't need to hold onto it)
+            seenCards = state.seen_cards(leader_move).get_cards()
+            for card in self.runningHand:
+                if card.rank == Rank.QUEEN or card.rank == Rank.KING:
+                    if self._get_counterpart(card) in self.runningHand:
+                        self.runningHand[card] *= 2.2
+
+            # Might get rid of this (if the leader card is a high card, increase trump multiplier).
+            if leader_move:
+                leaderCardPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), leader_move.cards[0].rank)
+                kingPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), Rank.KING)
+                if leaderCardPoints > kingPoints:
+                    self.trumpMultiplier *= 1.2
+            else:
+                self.trumpMultiplier /= 1.2
+
+            # Update weights of actual cards in running hand
+            for card in self.runningHand:
+                if card.rank == Rank.ACE:
+                    self.runningHand[card] = self.aceWeight
+                if card.rank == Rank.TEN:
+                    self.runningHand[card] = self.tenWeight
+                if card.rank == Rank.KING:
+                    self.runningHand[card] = self.kingWeight
+                if card.rank == Rank.QUEEN:
+                    self.runningHand[card] = self.queenWeight
+                if card.rank == Rank.JACK:
                     self.runningHand[card] = self.jackWeight
 
-        # Might get rid of this
-        if leader_move:
-            leaderCardPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), leader_move.cards[0].rank)
-            kingPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), Rank.KING)
-            if leaderCardPoints > kingPoints:
-                self.trumpMultiplier *= 2.15
+                if card.suit == state.get_trump_suit():
+                    self.runningHand[card] *= self.trumpMultiplier
+
+                # Increase weight of card with higher rank as leader move of same suit
+                if leader_move:
+                    leaderCard = leader_move.cards[0]
+                    if card.suit == leaderCard.suit and card.rank.value > leaderCard.rank.value:
+                        self.runningHand[card] *= 1.5
+
+                    # Increase weight of trumps if high non-trump card is played
+                    leaderPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), leaderCard.rank)
+                    kingPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), Rank.KING)
+                    if leaderCard.suit != state.get_trump_suit() and card.suit == state.get_trump_suit() and leaderPoints > kingPoints:
+                        self.runningHand[card] *= 1.5
+
+                    # Decrease weight of higher cards if opponent leads a trump
+                    cardPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), card.rank)
+                    queenPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), Rank.QUEEN)
+                    if cardPoints > queenPoints and leaderCard.suit == state.get_trump_suit():
+                        self.runningHand[card] /= 1.5
         else:
-            self.trumpMultiplier /= 1.25
+            #################################################
+            ###                CAREFUL:                   ###
+            ###    BAD CODING PRACTICES PAST THIS POINT   ###
+            #################################################
 
-        # Update weights of actual cards in running hand
-        for card in self.runningHand:
-            if card.rank == Rank.ACE:
-                self.runningHand[card] = self.aceWeight
-            if card.rank == Rank.TEN:
-                self.runningHand[card] = self.tenWeight
-            if card.rank == Rank.KING:
-                self.runningHand[card] = self.kingWeight
-            if card.rank == Rank.QUEEN:
-                self.runningHand[card] = self.queenWeight
-            if card.rank == Rank.JACK:
-                self.runningHand[card] = self.jackWeight
+            opponentsHand = state.get_opponent_hand_in_phase_two().cards
+            opponentNumTrumpCards = 0
+            opponentHighestTrumpCardPoints = 0
+            oPrevTrump = None
+            for card in opponentsHand:
+                if card.suit == state.get_trump_suit():
+                    opponentNumTrumpCards += 1
+                    if oPrevTrump is None:
+                        opponentHighestTrumpCardPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), card.rank)
+                    elif SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), card.rank) > SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), oPrevTrump.rank):
+                        opponentHighestTrumpCardPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), card.rank)
+                    oPrevTrump = card
 
-            if card.suit == state.get_trump_suit():
-                self.runningHand[card] *= self.trumpMultiplier
+            myNumTrumpCards = 0
+            myHighestTrumpCardPoints = 0
+            myPrevTrump = None
+            for card in state.get_hand().cards:
+                if card.suit == state.get_trump_suit():
+                    myNumTrumpCards += 1
+                    if myPrevTrump is None:
+                        myHighestTrumpCardPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), card.rank)
+                    elif SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), card.rank) > SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), myPrevTrump.rank):
+                        myHighestTrumpCardPoints = SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), card.rank)
+                    myPrevTrump = card
 
-            # Increase weight of card with higher rank as leader move of same suit
-            if leader_move:
-                leaderCard = leader_move.cards[0]
-                if card.suit == leaderCard.suit and card.rank.value > leaderCard.rank.value:
-                    self.runningHand[card] *= 2.5
+            if myNumTrumpCards > opponentNumTrumpCards or (myNumTrumpCards == opponentNumTrumpCards and myHighestTrumpCardPoints > opponentHighestTrumpCardPoints):
+                for card in self.runningHand:
+                    if card.suit == state.get_trump_suit():
+                        self.runningHand[card] *= 2
+                    else:
+                        self.runningHand[card] /= 1.3
+            else:
+                opponentsSuits = []
+                for card in opponentsHand:
+                    if card.suit not in opponentsSuits:
+                        opponentsSuits.append(card.suit)
+
+                for card in self.runningHand:
+                    if card.suit not in opponentsSuits and opponentNumTrumpCards > 0 and SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), card.rank) < SchnapsenTrickScorer.rank_to_points(SchnapsenTrickScorer(), Rank.KING):
+                        self.runningHand[card] *= 1.5
+                    elif card.suit not in opponentsSuits and opponentNumTrumpCards < 1:
+                        self.runningHand[card] *= 1.65
+
+
 
     def _print_stats(self, state, leader_move, move):
-        print(f"runningHand: {self.runningHand}\n"
+        print(f"true hand: {state.get_hand()}\n"
+              f"runningHand: {self.runningHand}, length: {len(self.runningHand)}\n"
               f"marriageHand: {self.marriageHand}\n"
               f"leader move: {leader_move}\n"
               f"valid moves: {state.valid_moves()}\n"
+              f"trump suit: {state.get_trump_suit()}\n"
               f"myScore: {state.get_my_score()}, opponent score {state.get_opponent_score()}\n"
               f"aceWeight: {self.aceWeight}\n"
               f"tenWeight: {self.tenWeight}\n"
@@ -177,49 +253,9 @@ class StrategyBot1(Bot):
                 self.runningHand[card] = self.marriageHand[card]
         self.marriageHand.clear()
 
-    def _set_trumpcards_weights(self, trumpSuit: Suit, influenceFactor: float) -> None:
-        """
-        Uses the trump suit to influence the weights of the trump cards in the running hand.
-        influenceFactor: - is how much to divide by, + is how much to multiply by
-        """
-        if influenceFactor < 0:
-            for card in self.runningHand:
-                if card.suit == trumpSuit:
-                    if card.rank == Rank.ACE:
-                        self.runningHand[card] = self.aceWeight / abs(influenceFactor)
-                    elif card.rank == Rank.TEN:
-                        self.runningHand[card] = self.tenWeight / abs(influenceFactor)
-                    elif card.rank == Rank.KING:
-                        self.runningHand[card] = self.kingWeight / abs(influenceFactor)
-                    elif card.rank == Rank.QUEEN:
-                        self.runningHand[card] = self.queenWeight / abs(influenceFactor)
-                    elif card.rank == Rank.JACK:
-                        self.runningHand[card] = self.jackWeight / abs(influenceFactor)
-        else:
-            for card in self.runningHand:
-                if card.suit == trumpSuit:
-                    if card.rank == Rank.ACE:
-                        self.runningHand[card] = self.aceWeight * abs(influenceFactor)
-                    elif card.rank == Rank.TEN:
-                        self.runningHand[card] = self.tenWeight * abs(influenceFactor)
-                    elif card.rank == Rank.KING:
-                        self.runningHand[card] = self.kingWeight * abs(influenceFactor)
-                    elif card.rank == Rank.QUEEN:
-                        self.runningHand[card] = self.queenWeight * abs(influenceFactor)
-                    elif card.rank == Rank.JACK:
-                        self.runningHand[card] = self.jackWeight * abs(influenceFactor)
-
-    def _divide_marriage_weights(self, state, card1, card2):
-        pass
-
-    def _multiply_marriage_weights(self, state, card1, card2):
-        pass
-
     def _separate_marriage(self, card1, card2):
         self.marriageHand[card1] = self.runningHand[card1]
         self.marriageHand[card2] = self.runningHand[card2]
-        del self.runningHand[card1]
-        del self.runningHand[card2]
 
     def __repr__(self) -> str:
         return f"StrategyBot1(seed={self.seed})"
